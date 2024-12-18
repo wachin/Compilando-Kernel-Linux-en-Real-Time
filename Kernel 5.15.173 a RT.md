@@ -1,22 +1,27 @@
+Estos son los pasos que he seguido para compilar el Kernel 5.15.173 con el parche Real Time
+
 
 Actualizando el sistema
 Actualice los repositorios:
-
+```
 sudo apt update
- 
+ ```
 Actualice los paquetes: 
-
+```
 sudo apt upgrade
-
+```
 Instalando las dependencias
 
 Instalar:
-
+```
 sudo apt-get install gcc build-essential libncurses5-dev fakeroot wget xz-utils \
 	flex bison libssl-dev autoconf automake cmake dwarves openssl libelf-dev \
 	libudev-dev libpci-dev libiberty-dev bc python3-sphinx lzop lzma \
 	lzma-dev libmpc-dev u-boot-tools gettext rsync libncurses-dev \
 	libelf-dev libudev-dev pkg-config
+```
+
+Descargando el código fuente y parche del Kernel:
 
 ```
 wachin@mx23:~/Dev/kernel-5.15.173-a-RT
@@ -82,6 +87,13 @@ y lo siguiente es lo que he activado:
     -> Default CPUFreq governor
      (X) performance 
 ```
+
+Además al kernel le desabilité la máquinavirtual:
+
+-> Processor type and features -> [ ] Linux Guest Support ---
+
+-> [ ] Virtualization --- 
+
 
 Ya se compiló y me un error, y le pregunto a ChatGPT:
 
@@ -167,45 +179,8 @@ dpkg: error al procesar el paquete linux-image-5.15.173-rt82-debian12-novm-pae (
 Se encontraron errores al procesar:
  linux-image-5.15.173-rt82-debian12-novm-pae
 ```
-por cierto al kernel le desabilité la máquinavirtual:
 
-
--> Processor type and features -> [ ] Linux Guest Support ---
-
--> [ ] Virtualization --- 
-
-Pero eso no se si habrá influido.
-
-y antes de compilarlo cuando cerré menuconfig no había ningún mensaje de error:
-
-```
-$ make menuconfig
-  HOSTCC  scripts/kconfig/mconf.o
-  HOSTCC  scripts/kconfig/lxdialog/checklist.o
-  HOSTCC  scripts/kconfig/lxdialog/inputbox.o
-  HOSTCC  scripts/kconfig/lxdialog/menubox.o
-  HOSTCC  scripts/kconfig/lxdialog/textbox.o
-  HOSTCC  scripts/kconfig/lxdialog/util.o
-  HOSTCC  scripts/kconfig/lxdialog/yesno.o
-  HOSTCC  scripts/kconfig/confdata.o
-  HOSTCC  scripts/kconfig/expr.o
-  LEX     scripts/kconfig/lexer.lex.c
-  YACC    scripts/kconfig/parser.tab.[ch]
-  HOSTCC  scripts/kconfig/lexer.lex.o
-  HOSTCC  scripts/kconfig/menu.o
-  HOSTCC  scripts/kconfig/parser.tab.o
-  HOSTCC  scripts/kconfig/preprocess.o
-  HOSTCC  scripts/kconfig/symbol.o
-  HOSTCC  scripts/kconfig/util.o
-  HOSTLD  scripts/kconfig/mconf
-
-
-*** End of the configuration.
-*** Execute 'make' to start the build or try 'make help'.
-```
- 
- 
-
+y antes de compilarlo cuando cerré menuconfig no había ningún mensaje de error
 
 # Respuesta de ChatGPT:
 
@@ -436,6 +411,4 @@ Si en el futuro necesitas estos controladores (por ejemplo, para usar una tarjet
 sudo apt install broadcom-sta-dkms rtl8812au-dkms rtl8821cu-dkms
 ```
 
----
-
-Si necesitas más ayuda o quieres verificar paso a paso, avísame. 😊
+Después de hacer eso lo puede instalar correctamente, reiniciar el ordenador y elegir el kernel web el Grub y activar JACK con Qsynth y todo funciona bien
