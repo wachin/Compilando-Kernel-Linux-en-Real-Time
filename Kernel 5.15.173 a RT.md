@@ -1,22 +1,27 @@
+Estos son los pasos que he seguido para compilar el Kernel 5.15.173 con el parche Real Time
+
 
 Actualizando el sistema
 Actualice los repositorios:
-
+```
 sudo apt update
- 
+ ```
 Actualice los paquetes: 
-
+```
 sudo apt upgrade
-
+```
 Instalando las dependencias
 
 Instalar:
-
+```
 sudo apt-get install gcc build-essential libncurses5-dev fakeroot wget xz-utils \
 	flex bison libssl-dev autoconf automake cmake dwarves openssl libelf-dev \
 	libudev-dev libpci-dev libiberty-dev bc python3-sphinx lzop lzma \
 	lzma-dev libmpc-dev u-boot-tools gettext rsync libncurses-dev \
 	libelf-dev libudev-dev pkg-config
+```
+
+Descargando el código fuente y parche del Kernel:
 
 ```
 wachin@mx23:~/Dev/kernel-5.15.173-a-RT
@@ -82,6 +87,13 @@ y lo siguiente es lo que he activado:
     -> Default CPUFreq governor
      (X) performance 
 ```
+
+Además al kernel le desabilité la máquinavirtual:
+
+-> Processor type and features -> [ ] Linux Guest Support ---
+
+-> [ ] Virtualization --- 
+
 
 Ya se compiló y me un error, y le pregunto a ChatGPT:
 
@@ -167,6 +179,7 @@ dpkg: error al procesar el paquete linux-image-5.15.173-rt82-debian12-novm-pae (
 Se encontraron errores al procesar:
  linux-image-5.15.173-rt82-debian12-novm-pae
 ```
+<<<<<<< HEAD
 por cierto al kernel le desabilité la máquinavirtual:
 
 
@@ -205,3 +218,238 @@ $ make menuconfig
 ```
  
  
+=======
+
+y antes de compilarlo cuando cerré menuconfig no había ningún mensaje de error
+
+# Respuesta de ChatGPT:
+
+El error principal que estás viendo durante la instalación del kernel es debido a que **`dkms`** (Dynamic Kernel Module Support) está intentando reconstruir módulos externos, y algunos de ellos están fallando porque **no son compatibles** con tu nuevo kernel RT o la configuración actual.
+
+---
+
+### **1. Identificación del problema**
+Las líneas clave son estas:
+
+```
+Error! Bad return status for module build on kernel: 5.15.173-rt82-debian12-novm-pae (i686)
+Consult /var/lib/dkms/8812au/5.13.6/build/make.log for more information.
+...
+Error! Bad return status for module build on kernel: 5.15.173-rt82-debian12-novm-pae (i686)
+Consult /var/lib/dkms/rtl8821cu/5.12.0/build/make.log for more information.
+Error! One or more modules failed to install during autoinstall.
+```
+
+- **`8812au` y `rtl8821cu`** son módulos de controladores de red inalámbrica gestionados por `dkms`.
+- Al instalar el nuevo kernel, `dkms` intenta recompilar estos módulos para el kernel `5.15.173-rt82-debian12-novm-pae`.
+- La compilación falla, lo cual causa que el script `postinst` del paquete `linux-image` devuelva un error.
+
+---
+
+### **2. ¿Por qué ocurre?**
+1. **Incompatibilidad del código fuente** de los módulos `8812au` y `rtl8821cu` con el nuevo kernel RT (probablemente cambios en la API del kernel).
+2. Deshabilitar "Linux Guest Support" y "Virtualization" no influye directamente en este error, así que puedes descartarlo.
+
+---
+
+### **3. Solución paso a paso**
+
+**¿Cómo se instalaron los módulos 8812au y rtl8821cu en tu sistema?**
+
+En MX Linux (o Debian), los módulos como **`8812au`** y **`rtl8821cu`** pueden haber sido instalados de varias formas:
+
+1. **Instalación automática durante la instalación del sistema operativo**:
+   - Algunos controladores adicionales vienen preinstalados en MX Linux si se detecta hardware compatible.
+   - MX Linux incluye muchos módulos de `dkms` y controladores de red en su instalación por defecto.
+
+2. **Instalación mediante `apt update` y `apt upgrade`**:
+   - Si tu sistema detectó hardware inalámbrico (como una tarjeta Wi-Fi USB que necesita `8812au` o `rtl8821cu`), `apt` puede haber instalado automáticamente los paquetes correspondientes.
+   - Los paquetes `dkms` se actualizan automáticamente al ejecutar `sudo apt upgrade`.
+
+3. **Instalación manual (posible)**:
+   - Si alguna vez instalaste controladores Wi-Fi desde GitHub, AUR (en sistemas Arch), o mediante compilación manual, estos módulos podrían haber quedado registrados en `dkms`.
+
+---
+
+### **¿Cómo verificar qué instaló los módulos `8812au` y `rtl8821cu`?**
+
+1. Usa **`dkms status`** para listar todos los módulos `dkms` instalados:
+   ```bash
+   dkms status
+   ```
+   Esto mostrará las versiones de los módulos y para qué kernels están instalados.
+
+2. Verifica si los módulos están instalados a través de APT:
+   ```bash
+   apt list --installed | grep -E '8812au|rtl8821cu'
+   ```
+   Esto mostrará si estos módulos fueron instalados como paquetes `.deb`.
+
+3. Si no aparecen en APT, pero sí en `dkms`, entonces probablemente se instalaron manualmente desde una fuente externa.
+
+---
+
+### **Recomendaciones finales**
+
+1. **Si los módulos no son críticos** (no usas dispositivos Wi-Fi que requieran `8812au` o `rtl8821cu`):
+   - Elimínalos temporalmente de `dkms`:
+     ```bash
+     sudo dkms remove 8812au/5.13.6 --all
+     sudo dkms remove rtl8821cu/5.12.0 --all
+     ```
+   - Luego reinstala el kernel:
+     ```bash
+     sudo dpkg -i linux-image-5.15.173-rt82-debian12-novm-pae_5.15.173-1_i386.deb \
+                 linux-headers-5.15.173-rt82-debian12-novm-pae_5.15.173-1_i386.deb
+     ```
+
+2. **Si necesitas los módulos (usos de red Wi-Fi)**:
+   - Descarga una versión actualizada y compatible de los controladores desde repositorios en **GitHub**:
+     - **rtl8812au**:  
+       ```bash
+       git clone https://github.com/aircrack-ng/rtl8812au.git
+       cd rtl8812au
+       sudo dkms add .
+       sudo dkms build 8812au/5.13.6
+       sudo dkms install 8812au/5.13.6
+       ```
+     - **rtl8821cu**:  
+       Busca repositorios en GitHub compatibles con el kernel 5.15 RT y sigue un proceso similar.
+
+3. **Si prefieres el kernel 6.1**:
+   - Descarga el código fuente del kernel **6.1** desde Debian o MX Linux.
+   - Aplica el parche RT correspondiente desde [kernel.org](https://www.kernel.org/pub/linux/kernel/projects/rt/6.1/).
+   - Compila el kernel con tus configuraciones optimizadas.
+
+
+
+> me devuelve lo siguiente: "wachin@mx23:~/Dev/kernel-5.15.173-a-RT/linux-5.15.173
+$ dkms status
+/usr/sbin/dkms.mx status
+8812au/5.13.6, 6.1.0-25-686-pae, i686: installed
+8812au/5.13.6, 6.1.0-28-686-pae, i686: installed
+broadcom-sta/6.30.223.271, 5.15.173-rt82-debian12-novm-pae, i686: installed
+broadcom-sta/6.30.223.271, 6.1.0-25-686-pae, i686: installed
+broadcom-sta/6.30.223.271, 6.1.0-28-686-pae, i686: installed
+rtl8821cu/5.12.0, 6.1.0-25-686-pae, i686: installed
+rtl8821cu/5.12.0, 6.1.0-28-686-pae, i686: installed" pero este ordenador no usa Wi-Fi, solo está conectado por cable así que los voy a desinstalar así como me dices, pero pregunto, si los desinstalo y luego instalo otra vez el kernel esos modulos se volverán a instalar o ya no
+
+
+Si desinstalas los módulos **`8812au`** y **`rtl8821cu`** de `dkms`, **no se reinstalarán automáticamente** cuando instales otro kernel, a menos que:
+
+1. **Los módulos estén instalados como paquetes APT** (en cuyo caso, APT intentará reconstruirlos durante la instalación del kernel).
+2. **Tengas un script o configuración adicional** que fuerce su reconstrucción con `dkms`.
+
+---
+
+### **Verificación antes de desinstalar**
+Primero asegúrate de que los módulos no vienen de un paquete APT. Ejecuta:
+```bash
+apt list --installed | grep -E '8812au|rtl8821cu|broadcom-sta'
+```
+
+- Si **aparecen en la lista**, significa que se instalaron a través de APT. En este caso, tendrás que eliminarlos con `apt`:
+   ```bash
+   sudo apt remove --purge rtl8821cu-dkms 8812au-dkms broadcom-sta-dkms
+   ```
+
+- Si **no aparecen**, entonces los módulos se añadieron manualmente a `dkms` y puedes eliminarlos con:
+   ```bash
+   sudo dkms remove 8812au/5.13.6 --all
+   sudo dkms remove rtl8821cu/5.12.0 --all
+   sudo dkms remove broadcom-sta/6.30.223.271 --all
+   ```
+
+---
+
+### **Instalar otro kernel después de desinstalar**
+Una vez que hayas eliminado los módulos de `dkms`, estos **no se volverán a instalar automáticamente** al instalar otro kernel porque:
+
+1. `dkms` no tendrá registros de esos módulos.
+2. Si los módulos venían de paquetes APT y los desinstalaste, no podrán reconstruirse.
+
+---
+
+### **Opcional: Evitar futuras instalaciones automáticas de módulos no deseados**
+Si quieres asegurarte de que no se vuelvan a instalar estos módulos por error en el futuro:
+
+1. **Bloquea los paquetes APT** (si existían):
+   ```bash
+   sudo apt-mark hold rtl8821cu-dkms 8812au-dkms broadcom-sta-dkms
+   ```
+
+2. **Limpia registros de `dkms`**:
+   Asegúrate de que no queden rastros en el sistema:
+   ```bash
+   sudo rm -rf /var/lib/dkms/8812au
+   sudo rm -rf /var/lib/dkms/rtl8821cu
+   sudo rm -rf /var/lib/dkms/broadcom-sta
+   ```
+
+
+
+
+
+> aquí está lo que aparece: "wachin@mx23:~/Dev/kernel-5.15.173-a-RT/linux-5.15.173
+$ apt list --installed | grep -E '8812au|rtl8821cu|broadcom-sta'
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+broadcom-sta-dkms/stable,now 6.30.223.271-23 all [instalado]
+rtl8812au-dkms/mx,now 5.13.6+git20230720-1~mx23+1 all [instalado]
+rtl8821cu-dkms/mx,now 5.12.0+git20230215-1~mx23+3 all [instalado]"
+
+
+
+Perfecto, ahora queda claro que los módulos **broadcom-sta-dkms**, **rtl8812au-dkms** y **rtl8821cu-dkms** **fueron instalados a través de APT**. Esto significa que durante la instalación de cualquier kernel, **`dkms`** intenta automáticamente reconstruir esos módulos.
+
+---
+
+### **¿Cómo solucionarlo?**
+
+Dado que no usas Wi-Fi y estos módulos no son necesarios, puedes desinstalarlos con APT. Esto evitará que `dkms` los intente compilar cada vez que instales un nuevo kernel.
+
+1. **Desinstala los módulos innecesarios**:
+   ```bash
+   sudo apt remove --purge broadcom-sta-dkms rtl8812au-dkms rtl8821cu-dkms
+   ```
+
+2. **Limpia los registros de `dkms`**:
+   Después de desinstalarlos, verifica que no queden rastros en `dkms`:
+   ```bash
+   sudo dkms status
+   ```
+
+   Si todavía aparecen, elimínalos manualmente:
+   ```bash
+   sudo dkms remove 8812au/5.13.6 --all
+   sudo dkms remove rtl8821cu/5.12.0 --all
+   sudo dkms remove broadcom-sta/6.30.223.271 --all
+   ```
+
+3. **Instala el kernel compilado**:
+   Ahora puedes instalar tu kernel RT sin que `dkms` intente reconstruir módulos innecesarios:
+   ```bash
+   sudo dpkg -i linux-image-5.15.173-rt82-debian12-novm-pae_5.15.173-1_i386.deb \
+               linux-headers-5.15.173-rt82-debian12-novm-pae_5.15.173-1_i386.deb
+   ```
+
+4. **Verificación final**:
+   - Asegúrate de que el kernel se haya instalado correctamente:
+     ```bash
+     dpkg -l | grep linux-image
+     ```
+   - Reinicia y selecciona el kernel RT en el menú GRUB.
+
+---
+
+### **¿Qué pasa si instalo otro kernel más adelante?**
+Como desinstalaste los paquetes `broadcom-sta-dkms`, `rtl8812au-dkms` y `rtl8821cu-dkms`, **`dkms` ya no intentará reconstruirlos** automáticamente cuando instales otro kernel.
+
+Si en el futuro necesitas estos controladores (por ejemplo, para usar una tarjeta Wi-Fi), puedes reinstalarlos con:
+```bash
+sudo apt install broadcom-sta-dkms rtl8812au-dkms rtl8821cu-dkms
+```
+
+Después de hacer eso lo puede instalar correctamente, reiniciar el ordenador y elegir el kernel web el Grub y activar JACK con Qsynth y todo funciona bien
+>>>>>>> refs/remotes/origin/main
